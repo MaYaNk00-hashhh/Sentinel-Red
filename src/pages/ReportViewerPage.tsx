@@ -235,6 +235,7 @@ export default function ReportViewerPage() {
       </Card>
 
       {/* Recommendations */}
+      {/* Recommendations */}
       <Card className="bg-card border-yellow-green/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -244,15 +245,60 @@ export default function ReportViewerPage() {
             Recommendations
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <ul className="space-y-3">
-            {report.recommendations.map((rec, index) => (
-              <li key={index} className="flex gap-3">
-                <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                <span className="text-muted-foreground">{rec}</span>
-              </li>
-            ))}
-          </ul>
+        <CardContent className="space-y-6">
+          {report.recommendations.immediate_actions && report.recommendations.immediate_actions.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-critical mb-3">Immediate Actions</h3>
+              <ul className="space-y-2">
+                {report.recommendations.immediate_actions.map((rec: string, index: number) => (
+                  <li key={index} className="flex gap-3">
+                    <AlertTriangle className="h-4 w-4 text-critical mt-0.5 flex-shrink-0" />
+                    <span className="text-muted-foreground">{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.recommendations.short_term_fixes && report.recommendations.short_term_fixes.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-high mb-3">Short-term Fixes</h3>
+              <ul className="space-y-2">
+                {report.recommendations.short_term_fixes.map((rec: string, index: number) => (
+                  <li key={index} className="flex gap-3">
+                    <CheckCircle2 className="h-4 w-4 text-high mt-0.5 flex-shrink-0" />
+                    <span className="text-muted-foreground">{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {report.recommendations.long_term_improvements && report.recommendations.long_term_improvements.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-yellow-green mb-3">Long-term Improvements</h3>
+              <ul className="space-y-2">
+                {report.recommendations.long_term_improvements.map((rec: string, index: number) => (
+                  <li key={index} className="flex gap-3">
+                    <CheckCircle2 className="h-4 w-4 text-yellow-green mt-0.5 flex-shrink-0" />
+                    <span className="text-muted-foreground">{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Fallback for legacy flat array if needed, or compliance notes */}
+          {Array.isArray(report.recommendations) && (
+            <ul className="space-y-3">
+              {report.recommendations.map((rec: string, index: number) => (
+                <li key={index} className="flex gap-3">
+                  <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">{rec}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

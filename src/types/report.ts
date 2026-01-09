@@ -14,7 +14,12 @@ export interface SecurityReport {
     summary: string
   }
   findings: Vulnerability[]
-  recommendations: string[]
+  recommendations: {
+    immediate_actions: string[]
+    short_term_fixes: string[]
+    long_term_improvements: string[]
+    compliance_notes: string[]
+  } | string[]
   metadata: {
     scan_duration: number
     endpoints_tested: number

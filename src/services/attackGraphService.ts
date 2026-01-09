@@ -1,123 +1,189 @@
+import apiClient from '@/lib/api'
 import { AttackGraph, AttackNode } from '@/types/attackGraph'
 
-const mockGraph: AttackGraph = {
-  scan_id: 'scan-1',
-  nodes: [
-    {
-      id: 'start',
-      type: 'start',
-      label: 'Attacker',
-      position: { x: 250, y: 0 },
-      data: { description: 'External Threat Actor' }
-    },
-    {
-      id: 'node-1',
-      type: 'api_call',
-      label: 'Login API',
-      position: { x: 250, y: 100 },
-      data: {
-        method: 'POST',
-        endpoint: '/api/auth/login',
-        description: 'Authentication Endpoint'
-      }
-    },
-    {
-      id: 'node-2',
-      type: 'vulnerability',
-      label: 'SQL Injection',
-      position: { x: 250, y: 200 },
-      data: {
-        vulnerability_id: 'vuln-1',
-        description: 'SQL Injection in username parameter'
-      }
-    },
-    {
-      id: 'node-3',
-      type: 'exploit',
-      label: 'Auth Bypass',
-      position: { x: 250, y: 300 },
-      data: {
-        description: 'Bypassed authentication using SQLi'
-      }
-    },
-    {
-      id: 'node-4',
-      type: 'api_call',
-      label: 'User Profile',
-      position: { x: 250, y: 400 },
-      data: {
-        method: 'GET',
-        endpoint: '/api/users/:id',
-        description: 'Access User Data'
-      }
-    },
-    {
-      id: 'node-5',
-      type: 'vulnerability',
-      label: 'IDOR',
-      position: { x: 250, y: 500 },
-      data: {
-        vulnerability_id: 'vuln-2',
-        description: 'Insecure Direct Object Reference'
-      }
-    },
-    {
-      id: 'end',
-      type: 'end',
-      label: 'Data Breach',
-      position: { x: 250, y: 600 },
-      data: { description: 'Access to sensitive user data' }
-    }
-  ],
-  edges: [
-    { id: 'e1', source: 'start', target: 'node-1', label: 'Initiates', type: 'default' },
-    { id: 'e2', source: 'node-1', target: 'node-2', label: 'Exploits', type: 'vulnerable' },
-    { id: 'e3', source: 'node-2', target: 'node-3', label: 'Result', type: 'exploit' },
-    { id: 'e4', source: 'node-3', target: 'node-4', label: 'Accesses', type: 'default' },
-    { id: 'e5', source: 'node-4', target: 'node-5', label: 'Exploits', type: 'vulnerable' },
-    { id: 'e6', source: 'node-5', target: 'end', label: 'Leads to', type: 'vulnerable' }
-  ]
+// Types for API responses
+export interface NodeDetails {
+  node: AttackNode
+  scan_id: string | null
+  requests: RequestEvidence[]
+  analysis: string
+  relatedNodes: AttackNode[]
+  attackPaths: AttackPath[]
+}
+
+export interface RequestEvidence {
+  method: string
+  url: string
+  headers: Record<string, string>
+  body: any
+  response: {
+    status: number
+    headers: Record<string, string>
+    body: any
+  }
+}
+
+export interface AttackPath {
+  id: string
+  name: string
+  nodes: string[]
+  severity: string
+  description: string
+}
+
+export interface GraphAnalysis {
+  summary: {
+    totalNodes: number
+    totalEdges: number
+    vulnerabilityCount: number
+    exploitCount: number
+    apiCallCount: number
+    riskScore: number
+  }
+  severityCounts: {
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
+  vulnerabilities: Array<{
+    id: string
+    label: string
+    severity: string
+    description: string
+    recommendation?: string
+  }>
+  attackPaths: Array<{
+    id: string
+    name: string
+    nodeCount: number
+    vulnerabilityCount: number
+    severity: string
+    nodes: string[]
+  }>
+  recommendations: string[]
+  riskLevel: string
 }
 
 export const attackGraphService = {
+  /**
+   * Fetches the attack graph for a specific scan
+   */
   async getAttackGraph(scanId: string): Promise<AttackGraph> {
-    await new Promise(resolve => setTimeout(resolve, 800))
-    return { ...mockGraph, scan_id: scanId }
-  },
+    try {
+      const { data } = await apiClient.get<AttackGraph>(`/attack-graph/${scanId}`)
 
-  async getNodeDetails(nodeId: string): Promise<{
-    node: AttackNode
-    requests: Array<{
-      method: string
-      url: string
-      headers: Record<string, string>
-      body: unknown
-      response: {
-        status: number
-        headers: Record<string, string>
-        body: unknown
+      // Validate response structure
+      if (!data) {
+        throw new Error('No data received from server')
       }
-    }>
-  }> {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    const node = mockGraph.nodes.find(n => n.id === nodeId)
-    if (!node) throw new Error('Node not found')
 
-    return {
-      node,
-      requests: [
-        {
-          method: 'POST',
-          url: '/api/auth/login',
-          headers: { 'Content-Type': 'application/json' },
-          body: { username: "' OR 1=1 --", password: "any" },
-          response: {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-            body: { token: "ey..." }
-          }
-        }
-      ]
+      // Ensure nodes and edges arrays exist
+      return {
+        nodes: Array.isArray(data.nodes) ? data.nodes : [],
+        edges: Array.isArray(data.edges) ? data.edges : [],
+        scan_id: data.scan_id || scanId
+      }
+    } catch (error: any) {
+      console.error('AttackGraphService.getAttackGraph Error:', error)
+
+      // Re-throw with more context
+      if (error.response?.status === 404) {
+        throw new Error('Scan not found')
+      }
+      if (error.response?.status === 400) {
+        throw new Error('Invalid scan ID')
+      }
+
+      throw new Error(error.response?.data?.message || error.message || 'Failed to fetch attack graph')
     }
   },
+
+  /**
+   * Fetches detailed information about a specific node
+   */
+  async getNodeDetails(nodeId: string, scanId?: string): Promise<NodeDetails> {
+    try {
+      const params = scanId ? { scanId } : {}
+      const { data } = await apiClient.get<NodeDetails>(`/attack-graph/node/${nodeId}`, { params })
+
+      // Validate response
+      if (!data) {
+        throw new Error('No data received from server')
+      }
+
+      // Ensure required fields exist
+      return {
+        node: data.node || {} as AttackNode,
+        scan_id: data.scan_id || null,
+        requests: Array.isArray(data.requests) ? data.requests : [],
+        analysis: data.analysis || 'No analysis available',
+        relatedNodes: Array.isArray(data.relatedNodes) ? data.relatedNodes : [],
+        attackPaths: Array.isArray(data.attackPaths) ? data.attackPaths : []
+      }
+    } catch (error: any) {
+      console.error('AttackGraphService.getNodeDetails Error:', error)
+
+      if (error.response?.status === 404) {
+        throw new Error('Node not found')
+      }
+
+      throw new Error(error.response?.data?.message || error.message || 'Failed to fetch node details')
+    }
+  },
+
+  /**
+   * Updates the attack graph for a specific scan
+   */
+  async updateAttackGraph(scanId: string, graph: AttackGraph): Promise<AttackGraph> {
+    try {
+      const { data } = await apiClient.put<AttackGraph>(`/attack-graph/${scanId}`, graph)
+
+      if (!data) {
+        throw new Error('No data received from server')
+      }
+
+      return {
+        nodes: Array.isArray(data.nodes) ? data.nodes : [],
+        edges: Array.isArray(data.edges) ? data.edges : [],
+        scan_id: data.scan_id || scanId
+      }
+    } catch (error: any) {
+      console.error('AttackGraphService.updateAttackGraph Error:', error)
+
+      if (error.response?.status === 404) {
+        throw new Error('Scan not found')
+      }
+
+      throw new Error(error.response?.data?.message || error.message || 'Failed to update attack graph')
+    }
+  },
+
+  /**
+   * Triggers AI analysis of the attack graph
+   */
+  async analyzeAttackGraph(scanId: string): Promise<GraphAnalysis> {
+    try {
+      const { data } = await apiClient.post<GraphAnalysis>(`/attack-graph/${scanId}/analyze`)
+
+      if (!data) {
+        throw new Error('No data received from server')
+      }
+
+      return data
+    } catch (error: any) {
+      console.error('AttackGraphService.analyzeAttackGraph Error:', error)
+
+      if (error.response?.status === 404) {
+        throw new Error('Scan not found')
+      }
+      if (error.response?.status === 400) {
+        throw new Error('No attack graph data available for analysis')
+      }
+
+      throw new Error(error.response?.data?.message || error.message || 'Failed to analyze attack graph')
+    }
+  }
 }
+
+export default attackGraphService

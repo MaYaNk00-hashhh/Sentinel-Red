@@ -1,47 +1,31 @@
 import type { LoginCredentials, RegisterData, AuthResponse, User } from '@/types/auth'
-
-const MOCK_USER: User = {
-  id: 'user-1',
-  name: 'Security Admin',
-  email: 'admin@sentinel.ai',
-  role: 'admin',
-  created_at: new Date().toISOString()
-}
+import apiClient from '@/lib/api'
 
 export const authService = {
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return {
-      user: MOCK_USER,
-      token: 'mock-jwt-token',
-      refresh_token: 'mock-refresh-token'
-    }
+    const { data } = await apiClient.post<AuthResponse>('/auth/login', credentials)
+    return data
   },
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    return {
-      user: { ...MOCK_USER, name: data.name, email: data.email },
-      token: 'mock-jwt-token',
-      refresh_token: 'mock-refresh-token'
-    }
+    const { data: response } = await apiClient.post<AuthResponse>('/auth/register', data)
+    return response
   },
 
   async forgotPassword(email: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await apiClient.post('/auth/forgot-password', { email })
   },
 
   async resetPassword(token: string, password: string): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 800))
+    await apiClient.post('/auth/reset-password', { token, password })
   },
 
   async getCurrentUser(): Promise<User> {
-    await new Promise(resolve => setTimeout(resolve, 500))
-    return MOCK_USER
+    const { data } = await apiClient.get<User>('/auth/me')
+    return data
   },
 
   async logout(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 500))
     localStorage.removeItem('auth_token')
     localStorage.removeItem('refresh_token')
   },

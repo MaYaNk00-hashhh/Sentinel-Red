@@ -51,6 +51,7 @@ export default function ProjectUpload() {
     let type: 'api' | 'codebase' = 'api'
     let file: File | undefined
     let repoUrl: string | undefined
+    let openapi_spec: string | undefined
 
     // Validation based on active tab
     if (activeTab === 'openapi') {
@@ -60,6 +61,20 @@ export default function ProjectUpload() {
         return
       }
       file = formData.apiFile
+
+      // Read file content
+      try {
+        openapi_spec = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = (e) => resolve(e.target?.result as string)
+          reader.onerror = (e) => reject(e)
+          reader.readAsText(file!)
+        })
+      } catch (err) {
+        setErrors({ apiFile: 'Failed to read file content' })
+        return
+      }
+
     } else if (activeTab === 'zip') {
       type = 'codebase'
       if (!formData.zipFile) {
@@ -67,6 +82,9 @@ export default function ProjectUpload() {
         return
       }
       file = formData.zipFile
+      // For MVP: We are not uploading the actual ZIP to storage yet (requires storage bucket)
+      // We will simulate it by setting a mock repoUrl so the backend knows it's a file.
+      repoUrl = `uploaded://${file.name}`
     } else if (activeTab === 'url') {
       type = 'api' // Treating Target URL as API project
       if (!formData.targetUrl.trim()) {
@@ -91,25 +109,26 @@ export default function ProjectUpload() {
         })
       }, 500)
 
+      // Send payload to backend
+      // Note: We are sending 'openapi_spec' which backend expects
       await projectService.uploadProject({
         name: formData.name,
         type,
-        file,
+        // file, // Don't send File object in JSON
         repoUrl,
-      })
+        openapi_spec
+      } as any) // Casting as any to bypass strict type check for now if interface mismatches
 
       clearInterval(progressInterval)
       setProgress(100)
 
-      toast({ title: 'Success', description: 'Scan initialized successfully' })
+      toast({ title: 'Success', description: 'Project created successfully' })
       setTimeout(() => {
-        // In a real app, this might start the scan immediately. 
-        // For now navigate to dashboard where the project is listed.
         navigate('/dashboard')
       }, 1000)
     } catch (error: any) {
       setProgress(0)
-      const errorMessage = error.response?.data?.message || 'Failed to start scan'
+      const errorMessage = error.response?.data?.message || 'Failed to create project'
       setErrors({ submit: errorMessage })
       toast({ title: 'Error', description: errorMessage, variant: 'destructive' })
     } finally {

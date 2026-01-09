@@ -20,6 +20,7 @@ export interface AttackNode {
       headers: Record<string, string>
       body: unknown
     }
+    severity?: 'critical' | 'high' | 'medium' | 'low'
   }
   position: {
     x: number
