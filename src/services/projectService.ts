@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api'
-import type { Project, ProjectUploadData, ScanStatus, Endpoint, ScanHistoryItem } from '@/types/project'
+import type { Project, ProjectUploadData, Endpoint, ScanHistoryItem, ScanStatusResponse } from '../types/project'
 import { PaginatedResponse, PaginationParams } from '@/hooks/useDataFetching'
 
 export const projectService = {
@@ -62,22 +62,22 @@ export const projectService = {
   /**
    * Get scan status
    */
-  async getScanStatus(scanId: string): Promise<import('@/types/project').ScanStatusResponse> {
-    const { data } = await apiClient.get<import('@/types/project').ScanStatusResponse>(`/projects/scan/${scanId}`)
+  async getScanStatus(scanId: string): Promise<ScanStatusResponse> {
+    const { data } = await apiClient.get<ScanStatusResponse>(`/projects/scan/${scanId}`)
     return data
   },
 
   /**
    * Pause a running scan (placeholder)
    */
-  async pauseScan(scanId: string): Promise<void> {
+  async pauseScan(_scanId: string): Promise<void> {
     console.log('Pause scan not implemented in backend MVP')
   },
 
   /**
    * Stop a running scan (placeholder)
    */
-  async stopScan(scanId: string): Promise<void> {
+  async stopScan(_scanId: string): Promise<void> {
     console.log('Stop scan not implemented in backend MVP')
   },
 

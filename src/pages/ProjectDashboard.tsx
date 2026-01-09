@@ -22,10 +22,7 @@ import {
   Play,
   AlertTriangle,
   Loader2,
-  MoreVertical,
   Eye,
-  FileText,
-  Settings,
   LayoutGrid,
   List
 } from 'lucide-react'

@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Play, Pause, Square, Terminal, Loader2, AlertCircle } from 'lucide-react'
-import { formatDate, formatDuration } from '@/lib/utils'
+
 import { useToast } from '@/components/ui/use-toast'
 
 export default function ScanControlPanel() {

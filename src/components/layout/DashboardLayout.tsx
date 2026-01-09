@@ -1,12 +1,11 @@
+
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
 import { Button } from '@/components/ui/button'
 import {
   LayoutDashboard,
-  FolderOpen,
-  Scan,
-  Network,
   ShieldAlert,
+  Scan,
   FileText,
   Settings,
   LogOut,

@@ -10,6 +10,7 @@ import { ArrowLeft, Download, FileText, ShieldAlert, AlertTriangle, CheckCircle2
 import { formatDate, downloadJSON } from '@/lib/utils'
 import type { SecurityReport } from '@/types/report'
 import { useToast } from '@/components/ui/use-toast'
+import { generatePDF } from '@/lib/pdfGenerator'
 
 export default function ReportViewerPage() {
   const { scanId } = useParams<{ scanId: string }>()
@@ -38,19 +39,13 @@ export default function ReportViewerPage() {
     }
   }
 
-  const handleExportPDF = async () => {
-    if (!scanId) return
+
+
+  const handleExportPDF = () => {
+    if (!report) return
 
     try {
-      const blob = await reportService.exportReportPDF(scanId)
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `security-report-${scanId}.pdf`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+      generatePDF(report)
       toast({ title: 'Success', description: 'PDF exported successfully' })
     } catch (error: any) {
       toast({ title: 'Error', description: 'Failed to export PDF', variant: 'destructive' })
@@ -246,7 +241,7 @@ export default function ReportViewerPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {report.recommendations.immediate_actions && report.recommendations.immediate_actions.length > 0 && (
+          {!Array.isArray(report.recommendations) && report.recommendations.immediate_actions && report.recommendations.immediate_actions.length > 0 && (
             <div>
               <h3 className="font-semibold text-critical mb-3">Immediate Actions</h3>
               <ul className="space-y-2">
@@ -260,7 +255,7 @@ export default function ReportViewerPage() {
             </div>
           )}
 
-          {report.recommendations.short_term_fixes && report.recommendations.short_term_fixes.length > 0 && (
+          {!Array.isArray(report.recommendations) && report.recommendations.short_term_fixes && report.recommendations.short_term_fixes.length > 0 && (
             <div>
               <h3 className="font-semibold text-high mb-3">Short-term Fixes</h3>
               <ul className="space-y-2">
@@ -274,7 +269,7 @@ export default function ReportViewerPage() {
             </div>
           )}
 
-          {report.recommendations.long_term_improvements && report.recommendations.long_term_improvements.length > 0 && (
+          {!Array.isArray(report.recommendations) && report.recommendations.long_term_improvements && report.recommendations.long_term_improvements.length > 0 && (
             <div>
               <h3 className="font-semibold text-yellow-green mb-3">Long-term Improvements</h3>
               <ul className="space-y-2">

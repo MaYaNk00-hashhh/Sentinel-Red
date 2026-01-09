@@ -1,0 +1,4 @@
+src/components/ErrorBoundary.tsx(1,8): error TS6133: 'React' is declared but its value is never read.
+src/components/layout/DashboardLayout.tsx(6,3): error TS6133: 'FolderOpen' is declared but its value is never read.
+src/components/layout/DashboardLayout.tsx(8,3): error TS6133: 'Network' is declared but its value is never read.
+src/lib/api.ts(18,11): error TS6133: 'refreshToken' is declared but its value is never read.

@@ -15,7 +15,6 @@ const apiClient = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('auth_token')
-    const refreshToken = localStorage.getItem('refresh_token')
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
