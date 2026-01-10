@@ -3,9 +3,6 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
     "dev": "vite --port 5181",
     "dev:backend": "npm run dev --prefix backend",
