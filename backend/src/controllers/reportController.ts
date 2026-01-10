@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { dbQuery, log, LogLevel, validate, createErrorResponse, createSuccessResponse } from '../utils/dbUtils';
 import { generateSecurityRecommendations } from '../services/aiService';
 import { attackGraphService } from '../services/attackGraphService';
+import { cache, CACHE_TTL, cacheKeys } from '../utils/cacheUtils';
 
 const CONTEXT = 'ReportController';
 
@@ -265,10 +266,42 @@ function generateDefaultRecommendations(vulnNodes: VulnerabilityNode[]): {
     return recommendations;
 }
 
+// Helper function to generate AI recommendations with timeout
+async function getAIRecommendationsWithTimeout(vulnNodes: any[], timeoutMs: number = 10000): Promise<any> {
+    const findingsForAI = vulnNodes.map(node => ({
+        id: node.id,
+        pattern: node.label,
+        severity: node.data?.severity || 'medium',
+        description: node.data?.description,
+        category: node.data?.category || 'general'
+    }));
+
+    if (findingsForAI.length === 0) {
+        return null;
+    }
+
+    // Create a promise that rejects after timeout
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('AI recommendation timeout')), timeoutMs);
+    });
+
+    try {
+        const result = await Promise.race([
+            generateSecurityRecommendations(findingsForAI),
+            timeoutPromise
+        ]);
+        return result;
+    } catch (error: any) {
+        log(LogLevel.WARN, CONTEXT, `AI recommendations failed or timed out: ${error.message}`);
+        return null;
+    }
+}
+
 // Main report endpoint
 export const getReport = async (req: Request, res: Response) => {
     const { scanId } = req.params;
     const context = `${CONTEXT}.getReport`;
+    const startTime = Date.now();
 
     log(LogLevel.INFO, context, `Generating report for scan: ${scanId}`);
 
@@ -279,6 +312,14 @@ export const getReport = async (req: Request, res: Response) => {
 
     if (!validate.isValidId(scanId)) {
         return createErrorResponse(res, 400, 'Invalid scan ID format', context, { scanId });
+    }
+
+    // Check cache first
+    const cacheKey = cacheKeys.report(scanId);
+    const cachedReport = cache.get(cacheKey);
+    if (cachedReport) {
+        log(LogLevel.INFO, context, `Returning cached report for scan: ${scanId}`);
+        return createSuccessResponse(res, cachedReport, context, 'Report retrieved from cache');
     }
 
     try {
@@ -331,24 +372,14 @@ export const getReport = async (req: Request, res: Response) => {
 
         log(LogLevel.INFO, context, `Found ${vulnNodes.length} vulnerabilities`, severityCounts);
 
-        // Get AI-powered recommendations (with fallback)
-        let aiRecommendations = null;
-        try {
-            log(LogLevel.DEBUG, context, 'Requesting AI recommendations...');
-            const findingsForAI = vulnNodes.map(node => ({
-                id: node.id,
-                pattern: node.label,
-                severity: node.data?.severity || 'medium',
-                description: node.data?.description,
-                category: node.data?.category || 'general'
-            }));
+        // Get AI-powered recommendations with timeout (max 10 seconds)
+        log(LogLevel.DEBUG, context, 'Requesting AI recommendations with timeout...');
+        const aiRecommendations = await getAIRecommendationsWithTimeout(vulnNodes, 10000);
 
-            if (findingsForAI.length > 0) {
-                aiRecommendations = await generateSecurityRecommendations(findingsForAI);
-                log(LogLevel.INFO, context, 'AI recommendations generated successfully');
-            }
-        } catch (aiError: any) {
-            log(LogLevel.WARN, context, `AI recommendations failed, using defaults: ${aiError.message}`);
+        if (aiRecommendations) {
+            log(LogLevel.INFO, context, 'AI recommendations generated successfully');
+        } else {
+            log(LogLevel.INFO, context, 'Using default recommendations (AI unavailable or timed out)');
         }
 
         // Calculate scan duration in seconds
@@ -378,8 +409,9 @@ export const getReport = async (req: Request, res: Response) => {
             },
 
             // Findings matching Vulnerability type
+            // Use scanId-nodeId format to match vulnerabilityService ID format
             findings: vulnNodes.map(node => ({
-                id: node.id,
+                id: `${scan.id}-${node.id}`,
                 scan_id: scan.id,
                 title: node.label || 'Unknown Vulnerability',
                 severity: (node.data?.severity || 'medium') as 'critical' | 'high' | 'medium' | 'low' | 'info',
@@ -410,9 +442,14 @@ export const getReport = async (req: Request, res: Response) => {
             }
         };
 
+        // Cache the report for 5 minutes
+        cache.set(cacheKey, report, CACHE_TTL.MEDIUM);
+
+        const generationTime = Date.now() - startTime;
         log(LogLevel.INFO, context, 'Report generated successfully', {
             vulnCount: vulnNodes.length,
-            riskLevel: report.executive_summary.overall_risk
+            riskLevel: report.executive_summary.overall_risk,
+            generationTimeMs: generationTime
         });
 
         return createSuccessResponse(res, report, context, 'Report generated successfully');

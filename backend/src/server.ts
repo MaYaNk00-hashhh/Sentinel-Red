@@ -13,17 +13,30 @@ import attackGraphRoutes from './routes/attackGraphRoutes';
 import reportRoutes from './routes/reportRoutes';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 6001;
 
 console.log('Initializing Server...');
 
-// Middleware
+// Middleware - Allow all origins in development for easier testing
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5180', 'http://localhost:3000', 'http://localhost:4173'],
-    credentials: true
+    origin: true, // Allow all origins
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Request logging middleware - MUST be before routes
+app.use((req: Request, res: Response, next: NextFunction) => {
+    const start = Date.now();
+    console.log(`[${new Date().toISOString()}] --> ${req.method} ${req.path}`);
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`[${new Date().toISOString()}] <-- ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
+    });
+    next();
+});
 
 console.log('Registering Routes...');
 app.use('/api/auth', authRoutes);
@@ -31,22 +44,6 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/attack-graph', attackGraphRoutes);
 app.use('/api/reports', reportRoutes);
 console.log('Routes Registered.');
-
-// Debug middleware to log all hits
-app.use((req, _res, next) => {
-    console.log(`DEBUG: Incoming Request: ${req.method} ${req.originalUrl}`);
-    next();
-});
-
-// Request logging middleware
-app.use((req: Request, res: Response, next: NextFunction) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        const duration = Date.now() - start;
-        console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`);
-    });
-    next();
-});
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {

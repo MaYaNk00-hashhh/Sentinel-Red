@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import { authService } from '@/services/authService'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,39 +23,84 @@ export default function RegisterPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Name validation
+    if (!formData.name || formData.name.trim().length < 2) {
+      newErrors.name = 'Name must be at least 2 characters'
+    }
+
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required'
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters'
+    } else if (!/(?=.*[a-z])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one lowercase letter'
+    } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one uppercase letter'
+    } else if (!/(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one number'
+    }
+
+    // Confirm password validation
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password'
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrors({})
 
-    if (formData.password !== formData.confirmPassword) {
-      setErrors({ confirmPassword: 'Passwords do not match' })
-      return
-    }
-
-    if (formData.password.length < 8) {
-      setErrors({ password: 'Password must be at least 8 characters' })
+    // Validate form before submission
+    if (!validateForm()) {
       return
     }
 
     setLoading(true)
 
-    // Bypass backend for testing purposes as per user request
-    setTimeout(() => {
-      const mockUser = {
-        id: 'user-' + Math.random().toString(36).substr(2, 9),
-        email: formData.email,
-        name: formData.name,
-        role: 'user' as const,
-        created_at: new Date().toISOString()
-      }
-      const mockToken = 'mock-jwt-token-' + Math.random().toString(36).substr(2, 9)
+    try {
+      const response = await authService.register({
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password
+      })
 
-      setAuth(mockUser, mockToken)
-      localStorage.setItem('refresh_token', 'mock-refresh-token')
-      toast({ title: 'Success', description: 'Account created successfully (Test Mode)' })
+      // Handle both 'token' and 'access_token' from backend
+      const token = response.token || response.access_token || ''
+
+      if (!token) {
+        throw new Error('No authentication token received')
+      }
+
+      setAuth(response.user, token)
+      if (response.refresh_token) {
+        localStorage.setItem('refresh_token', response.refresh_token)
+      }
+
+      toast({ title: 'Success', description: 'Account created successfully! Welcome to Sentinel Red.' })
       navigate('/dashboard')
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Registration failed. Please try again.'
+      setErrors({ submit: errorMessage })
+      toast({ title: 'Registration Failed', description: errorMessage, variant: 'destructive' })
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   return (
@@ -118,6 +164,11 @@ export default function RegisterPage() {
                 required
                 disabled={loading}
               />
+              {!errors.password && formData.password.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Min 8 characters with uppercase, lowercase, and number
+                </p>
+              )}
               {errors.password && (
                 <p className="text-sm text-destructive">{errors.password}</p>
               )}

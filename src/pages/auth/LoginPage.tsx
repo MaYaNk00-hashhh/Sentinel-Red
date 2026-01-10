@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '@/stores/authStore'
+import { authService } from '@/services/authService'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,28 +21,63 @@ export default function LoginPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Email validation
+    if (!formData.email) {
+      newErrors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
+    }
+
+    // Password validation
+    if (!formData.password) {
+      newErrors.password = 'Password is required'
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrors({})
+
+    // Validate form before submission
+    if (!validateForm()) {
+      return
+    }
+
     setLoading(true)
 
-    // Bypass backend for testing purposes as per user request
-    setTimeout(() => {
-      const mockUser = {
-        id: 'user-123',
-        email: formData.email || 'test@example.com',
-        name: 'Test User',
-        role: 'user' as const,
-        created_at: new Date().toISOString()
-      }
-      const mockToken = 'mock-jwt-token-12345'
+    try {
+      const response = await authService.login({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password
+      })
 
-      setAuth(mockUser, mockToken)
-      localStorage.setItem('refresh_token', 'mock-refresh-token')
-      toast({ title: 'Success', description: 'Logged in successfully (Test Mode)' })
+      // Handle both 'token' and 'access_token' from backend
+      const token = response.token || response.access_token || ''
+
+      if (!token) {
+        throw new Error('No authentication token received')
+      }
+
+      setAuth(response.user, token)
+      if (response.refresh_token) {
+        localStorage.setItem('refresh_token', response.refresh_token)
+      }
+
+      toast({ title: 'Success', description: 'Logged in successfully' })
       navigate('/dashboard')
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Invalid email or password'
+      setErrors({ submit: errorMessage })
+      toast({ title: 'Login Failed', description: errorMessage, variant: 'destructive' })
+    } finally {
       setLoading(false)
-    }, 1000)
+    }
   }
 
   return (

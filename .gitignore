@@ -28,3 +28,14 @@ dist-ssr
 .env.local
 .env.production.local
 .env.development.local
+backend/.env
+backend/.env.local
+backend/.env.production.local
+
+# Backend logs
+backend/logs/
+ai_debug.log
+
+# Build artifacts
+build/
+.vercel/

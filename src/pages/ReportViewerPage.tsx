@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { reportService } from '@/services/reportService'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Download, FileText, ShieldAlert, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Download, FileText, ShieldAlert, AlertTriangle, CheckCircle2, Shield, RefreshCw, Clock, ChevronDown, ChevronUp, Code, Target, Lightbulb } from 'lucide-react'
 import { formatDate, downloadJSON } from '@/lib/utils'
 import type { SecurityReport } from '@/types/report'
 import { useToast } from '@/components/ui/use-toast'
@@ -17,26 +17,52 @@ export default function ReportViewerPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [report, setReport] = useState<SecurityReport | null>(null)
+  const [loadTime, setLoadTime] = useState<number | null>(null)
+  const [expandedFindings, setExpandedFindings] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
-    if (scanId) {
-      loadReport()
-    }
-  }, [scanId])
+  const toggleFinding = (findingId: string) => {
+    setExpandedFindings(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(findingId)) {
+        newSet.delete(findingId)
+      } else {
+        newSet.add(findingId)
+      }
+      return newSet
+    })
+  }
 
-  const loadReport = async () => {
+  const loadReport = useCallback(async (isRefresh = false) => {
     if (!scanId) return
 
     try {
-      setLoading(true)
+      if (isRefresh) {
+        setRefreshing(true)
+      } else {
+        setLoading(true)
+      }
+      const startTime = Date.now()
       const data = await reportService.getReport(scanId)
+      setLoadTime(Date.now() - startTime)
       setReport(data)
     } catch (error: any) {
       toast({ title: 'Error', description: 'Failed to load report', variant: 'destructive' })
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
+  }, [scanId, toast])
+
+  useEffect(() => {
+    if (scanId) {
+      loadReport()
+    }
+  }, [scanId, loadReport])
+
+  const handleRefresh = () => {
+    loadReport(true)
   }
 
 
@@ -110,6 +136,16 @@ export default function ReportViewerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {loadTime && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Loaded in {loadTime}ms
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button variant="outline" onClick={handleExportPDF}>
             <Download className="mr-2 h-4 w-4" />
             Export PDF
@@ -193,36 +229,163 @@ export default function ReportViewerPage() {
               <TabsContent key={severity} value={severity} className="space-y-4 mt-4">
                 {report.findings
                   .filter((v) => severity === 'all' || v.severity === severity)
-                  .map((finding) => (
-                    <Card key={finding.id} className="hover:border-yellow-green/50 transition-all bg-card border-dim-grey/30 hover:shadow-lg hover:shadow-yellow-green/20">
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <CardTitle className="text-lg mb-2 flex items-center gap-2">
-                              {finding.title}
-                              <Badge variant={finding.severity as any}>{finding.severity}</Badge>
-                              <Badge variant="outline">{finding.type}</Badge>
-                            </CardTitle>
-                            <CardDescription>{finding.description}</CardDescription>
+                  .map((finding) => {
+                    const isExpanded = expandedFindings.has(finding.id)
+                    return (
+                      <Card
+                        key={finding.id}
+                        className={`transition-all bg-card border-dim-grey/30 cursor-pointer ${isExpanded ? 'border-yellow-green/50 shadow-lg shadow-yellow-green/20' : 'hover:border-yellow-green/30 hover:shadow-md hover:shadow-yellow-green/10'}`}
+                        onClick={() => toggleFinding(finding.id)}
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg mb-2 flex items-center gap-2 flex-wrap">
+                                {finding.title}
+                                <Badge variant={finding.severity as any}>{finding.severity}</Badge>
+                                <Badge variant="outline">{finding.type}</Badge>
+                              </CardTitle>
+                              <CardDescription>{finding.description}</CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2 ml-4">
+                              {isExpanded ? (
+                                <ChevronUp className="h-5 w-5 text-yellow-green" />
+                              ) : (
+                                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                              )}
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => navigate(`/dashboard/vulnerabilities/${finding.id}`)}
-                          >
-                            View Details
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span>Impact: {finding.impact}</span>
-                          <span>•</span>
-                          <span>Complexity: {finding.exploit_complexity}</span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                            <span>Impact: {finding.impact}</span>
+                            <span>•</span>
+                            <span>Complexity: {finding.exploit_complexity}</span>
+                          </div>
+
+                          {/* Expanded Details */}
+                          {isExpanded && (
+                            <div className="mt-6 space-y-6 border-t border-dim-grey/30 pt-6" onClick={(e) => e.stopPropagation()}>
+                              {/* Affected Endpoints */}
+                              {finding.affected_endpoints && finding.affected_endpoints.length > 0 && (
+                                <div className="space-y-2">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2 text-yellow-green">
+                                    <Target className="h-4 w-4" />
+                                    Affected Endpoints
+                                  </h4>
+                                  <ul className="text-sm text-muted-foreground bg-background/50 p-3 rounded-lg border border-dim-grey/20 space-y-1">
+                                    {finding.affected_endpoints.map((endpoint, idx) => (
+                                      <li key={idx} className="font-mono text-xs">{endpoint}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Evidence / Proof of Concept */}
+                              {finding.evidence && (
+                                <div className="space-y-2">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2 text-yellow-green">
+                                    <Code className="h-4 w-4" />
+                                    Evidence / Proof of Concept
+                                  </h4>
+                                  <div className="bg-background/80 p-4 rounded-lg border border-dim-grey/20 space-y-4">
+                                    <div>
+                                      <span className="text-xs font-semibold text-yellow-green">Request:</span>
+                                      <pre className="text-xs text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap font-mono">
+                                        {finding.evidence.request.method} {finding.evidence.request.url}
+                                        {'\n'}Headers: {JSON.stringify(finding.evidence.request.headers, null, 2)}
+                                        {finding.evidence.request.body ? `\nBody: ${JSON.stringify(finding.evidence.request.body, null, 2)}` : ''}
+                                      </pre>
+                                    </div>
+                                    <div>
+                                      <span className="text-xs font-semibold text-yellow-green">Response:</span>
+                                      <pre className="text-xs text-muted-foreground mt-1 overflow-x-auto whitespace-pre-wrap font-mono">
+                                        Status: {finding.evidence.response.status}
+                                        {'\n'}Headers: {JSON.stringify(finding.evidence.response.headers, null, 2)}
+                                        {finding.evidence.response.body ? `\nBody: ${JSON.stringify(finding.evidence.response.body, null, 2)}` : ''}
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Recommended Fixes */}
+                              {finding.recommended_fixes && finding.recommended_fixes.length > 0 && (
+                                <div className="space-y-2">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2 text-yellow-green">
+                                    <Lightbulb className="h-4 w-4" />
+                                    Recommended Fixes
+                                  </h4>
+                                  <ul className="text-sm text-muted-foreground bg-background/50 p-3 rounded-lg border border-dim-grey/20 space-y-2">
+                                    {finding.recommended_fixes.map((fix, idx) => (
+                                      <li key={idx} className="flex items-start gap-2">
+                                        <CheckCircle2 className="h-4 w-4 text-yellow-green mt-0.5 flex-shrink-0" />
+                                        <span>{fix}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Attack Chain */}
+                              {finding.attack_chain && finding.attack_chain.length > 0 && (
+                                <div className="space-y-2">
+                                  <h4 className="font-semibold text-sm flex items-center gap-2 text-yellow-green">
+                                    <ShieldAlert className="h-4 w-4" />
+                                    Attack Chain
+                                  </h4>
+                                  <div className="space-y-3">
+                                    {finding.attack_chain.map((step, idx) => (
+                                      <div key={idx} className="bg-background/50 p-3 rounded-lg border border-dim-grey/20">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <span className="bg-yellow-green text-background text-xs font-bold px-2 py-1 rounded">
+                                            Step {step.step}
+                                          </span>
+                                          <span className="text-sm font-medium">{step.action}</span>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mb-2">{step.description}</p>
+                                        {step.endpoint && (
+                                          <p className="text-xs font-mono text-muted-foreground">Endpoint: {step.endpoint}</p>
+                                        )}
+                                        <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                                          <div>
+                                            <span className="text-yellow-green">Expected:</span>
+                                            <p className="text-muted-foreground">{step.expected_outcome}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-yellow-green">Actual:</span>
+                                            <p className="text-muted-foreground">{step.actual_outcome}</p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Additional Details Grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-dim-grey/20">
+                                {finding.cvss_score !== undefined && (
+                                  <div className="text-center p-3 bg-background/50 rounded-lg border border-dim-grey/20">
+                                    <div className="text-lg font-bold text-yellow-green">{finding.cvss_score}</div>
+                                    <div className="text-xs text-muted-foreground">CVSS Score</div>
+                                  </div>
+                                )}
+                                <div className="text-center p-3 bg-background/50 rounded-lg border border-dim-grey/20">
+                                  <div className="text-sm font-bold text-yellow-green capitalize">{finding.exploit_complexity}</div>
+                                  <div className="text-xs text-muted-foreground">Exploit Complexity</div>
+                                </div>
+                                <div className="text-center p-3 bg-background/50 rounded-lg border border-dim-grey/20">
+                                  <div className="text-sm font-bold text-yellow-green">{formatDate(finding.discovered_at)}</div>
+                                  <div className="text-xs text-muted-foreground">Discovered</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
               </TabsContent>
             ))}
           </Tabs>
@@ -283,7 +446,25 @@ export default function ReportViewerPage() {
             </div>
           )}
 
-          {/* Fallback for legacy flat array if needed, or compliance notes */}
+          {/* Compliance Notes */}
+          {!Array.isArray(report.recommendations) && report.recommendations.compliance_notes && report.recommendations.compliance_notes.length > 0 && (
+            <div>
+              <h3 className="font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Compliance Notes
+              </h3>
+              <ul className="space-y-2">
+                {report.recommendations.compliance_notes.map((note: string, index: number) => (
+                  <li key={index} className="flex gap-3">
+                    <Shield className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                    <span className="text-muted-foreground">{note}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Fallback for legacy flat array if needed */}
           {Array.isArray(report.recommendations) && (
             <ul className="space-y-3">
               {report.recommendations.map((rec: string, index: number) => (
@@ -306,7 +487,11 @@ export default function ReportViewerPage() {
           <div className="grid md:grid-cols-3 gap-4">
             <div>
               <span className="text-sm font-medium text-muted-foreground">Scan Duration</span>
-              <p className="text-sm mt-1">{Math.round(report.metadata.scan_duration / 60)} minutes</p>
+              <p className="text-sm mt-1">
+                {report.metadata.scan_duration >= 60
+                  ? `${Math.round(report.metadata.scan_duration / 60)} minutes`
+                  : `${report.metadata.scan_duration} seconds`}
+              </p>
             </div>
             <div>
               <span className="text-sm font-medium text-muted-foreground">Endpoints Tested</span>

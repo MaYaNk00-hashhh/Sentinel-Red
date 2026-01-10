@@ -11,11 +11,19 @@ interface AuthState {
   updateUser: (user: Partial<User>) => void
 }
 
+// Helper to get initial token from localStorage
+const getInitialToken = (): string | null => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('auth_token')
+  }
+  return null
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
       user: null,
-      token: null,
+      token: getInitialToken(),
       isAuthenticated: false,
       setAuth: (user, token) => {
         localStorage.setItem('auth_token', token)
@@ -33,7 +41,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated, token: state.token }),
     }
   )
 )

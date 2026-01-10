@@ -40,4 +40,13 @@ export interface AttackGraph {
   nodes: AttackNode[]
   edges: AttackEdge[]
   scan_id: string
+  project_id?: string
+  project_name?: string
+  created_at?: string
+  metadata?: {
+    scanDate?: string
+    scanDuration?: number
+    scannedFiles?: number
+    scanPath?: string
+  }
 }
