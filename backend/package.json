@@ -3,9 +3,6 @@
     "version": "1.0.0",
     "description": "Backend for Sentinel Red Security Dashboard",
     "main": "src/server.ts",
-    "engines": {
-        "node": ">=20.0.0"
-    },
     "scripts": {
         "start": "ts-node src/server.ts",
         "dev": "cross-env DEV_MODE=true nodemon src/server.ts",
