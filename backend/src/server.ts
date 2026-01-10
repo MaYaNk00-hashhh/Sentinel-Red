@@ -28,7 +28,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 // Health check endpoint
-app.get('/health', (req: Request, res: Response) => {
+app.get('/health', (_req: Request, res: Response) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
@@ -37,28 +37,10 @@ app.get('/health', (req: Request, res: Response) => {
     });
 });
 
-// API Routes
-import authRoutes from './routes/authRoutes';
-import projectRoutes from './routes/projectRoutes';
-import attackGraphRoutes from './routes/attackGraphRoutes';
-import reportRoutes from './routes/reportRoutes';
-
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/attack-graph', attackGraphRoutes);
-app.use('/api/reports', reportRoutes);
-
-// 404 handler for undefined routes
-app.use((req: Request, res: Response) => {
-    res.status(404).json({
-        error: true,
-        message: `Route not found: ${req.method} ${req.path}`,
-        timestamp: new Date().toISOString()
-    });
-});
+// ... (skipping unchanged lines is implicit in replace_file_content logic if context is sufficient, but here I'll just target the error handler too)
 
 // Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     console.error(`[ERROR] ${new Date().toISOString()} - ${err.message}`);
     console.error(err.stack);
 
