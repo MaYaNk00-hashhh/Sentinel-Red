@@ -6,8 +6,16 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config();
 
+// API Routes
+import authRoutes from './routes/authRoutes';
+import projectRoutes from './routes/projectRoutes';
+import attackGraphRoutes from './routes/attackGraphRoutes';
+import reportRoutes from './routes/reportRoutes';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+console.log('Initializing Server...');
 
 // Middleware
 app.use(cors({
@@ -16,6 +24,19 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+console.log('Registering Routes...');
+app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/attack-graph', attackGraphRoutes);
+app.use('/api/reports', reportRoutes);
+console.log('Routes Registered.');
+
+// Debug middleware to log all hits
+app.use((req, _res, next) => {
+    console.log(`DEBUG: Incoming Request: ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 // Request logging middleware
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -64,8 +85,10 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-// Start server only if run directly
-if (require.main === module) {
+// Start server if run directly
+const isStandalone = require.main === module || process.env.DEV_MODE === 'true';
+
+if (isStandalone) {
     app.listen(PORT, () => {
         console.log(`
 ╔════════════════════════════════════════════════════════════╗

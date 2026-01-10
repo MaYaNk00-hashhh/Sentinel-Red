@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { log, LogLevel, validate, createErrorResponse, createSuccessResponse } from '../utils/dbUtils';
-import { attackGraphService, validateAttackGraph, AttackGraph, NodeDetails } from '../services/attackGraphService';
+import { attackGraphService, validateAttackGraph, AttackGraph } from '../services/attackGraphService';
 
 const CONTEXT = 'AttackGraphController';
 

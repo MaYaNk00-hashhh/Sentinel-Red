@@ -5,7 +5,7 @@
     "main": "src/server.ts",
     "scripts": {
         "start": "ts-node src/server.ts",
-        "dev": "nodemon src/server.ts"
+        "dev": "set DEV_MODE=true&& nodemon src/server.ts"
     },
     "keywords": [],
     "author": "",
